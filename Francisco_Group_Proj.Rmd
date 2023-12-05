@@ -1,0 +1,249 @@
+---
+title: "Francisco_Group_Proj"
+author: "Taylor Francisco"
+date: "2023-11-26"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+rm(list=ls())
+```
+
+
+#Set Up
+##Load Packages
+```{r}
+library(tidyverse)
+library(dplyr)
+library(purrr)
+library(readstata13)
+library(plyr)
+library(stargazer)
+library(stringr)
+library(ggplot2)
+library(psych)
+library(plm)
+library(visreg)
+library(VGAM)
+library(car)
+```
+
+
+##Upload Data
+```{r}
+anes_df <- read_csv("anes_timeseries_cdf_csv_20220916.csv")
+vote_df <- read_csv("Turnout_1980_2022_v1.0.csv")
+abortion_policy_df <- read_csv("Abortion_Policies.csv")
+```
+
+#Clean Data
+
+##ANES dataset
+```{r}
+#select only variables of interest
+
+anes_select_df <- anes_df %>% select("VCF0302", "VCF0705", "VCF0748", "VCF0900", 
+                                    "VCF0901b", "VCF9234", "VCF9235", "VCF0004", 
+                                    "VCF0006", "VCF0101", "VCF0102", "VCF0104", 
+                                    "VCF0105a", "VCF0105b", "VCF0106","VCF0107",
+                                    "VCF0108", "VCF0110","VCF0112", "VCF0128", 
+                                    "VCF0132","VCF0133", "VCF0138", "VCF0139", 
+                                    "VCF0140a","VCF0142", "VCF0900b", "VCF0230", 
+                                   "VCF0837", "VCF0838")
+
+#save as a csv for faster upload later
+#write.csv(anes_select_df, file ="ANES_select.csv", row.names = FALSE)
+
+#rename variables with descriptive name
+##note name STATE, STATE_ABV, YEAR all caps to match other dataframes
+
+                                            
+ d <- anes_select_df     
+ d$vote_pres = d$VCF0705
+ d$vote_elect_day =  d$VCF0748
+ d$congress_dist  = d$VCF0900
+d$STATE_ABV = d$VCF0901b 
+d$dem_cand_abort = d$VCF9234 
+ d$rep_cand_abort = d$VCF9234
+ d$YEAR = d$VCF0004
+ d$resp_id = d$VCF0006
+d$age = d$VCF0101
+d$age_group = d$VCF0102
+d$gender  = d$VCF0104
+d$race_seven  = d$VCF0105a 
+d$race_four   = d$VCF0105b 
+d$race_three  = d$VCF0106 
+d$hisp  = d$VCF0108
+d$edu_four  = d$VCF0110
+d$edu_seven   = d$VCF0140a 
+d$region  = d$VCF0112
+d$religion  = d$VCF0128 
+d$num_child = d$VCF0139 
+d$birth_place = d$VCF0142 
+d$state_congress_dist = d$VCF0900b
+d$anti_abort_therm  = d$VCF0230
+d$when_abort  = d$VCF0837
+d$abort_law   = d$VCF0838
+
+
+#anes_select_df <- anes_select_df %>% rename(party_id = VCF0302,
+#                           vote_pres = VCF0705,
+#                     vote_elect_day =  VCF0748, 
+#                      congress_dist  = VCF0900, 
+#                        STATE_ABV = VCF0901b, 
+#                      dem_cand_abort = VCF9234, 
+#                      rep_cand_abort = VCF9234, 
+#                                YEAR = VCF0004, 
+#                            resp_id = VCF0006, 
+#                                age = VCF0101, 
+#                          age_group = VCF0102,
+#                            gender  = VCF0104, 
+#                       race_seven  = VCF0105a, 
+#                       race_four   = VCF0105b, 
+#                       race_three  = VCF0106, 
+#                             hisp  = VCF0108, 
+#                         edu_four  = VCF0110,
+#                       edu_seven   = VCF0140a, 
+#                           region  = VCF0112, 
+#                         religion  = VCF0128, 
+#                         num_child = VCF0139, 
+#                       birth_place = VCF0142, 
+#               state_congress_dist = VCF0900b,
+#                 anti_abort_therm  = VCF0230,
+#                       when_abort  = VCF0837,
+#                       abort_law   = VCF0838)
+
+anes_renamed_df <- d %>% select("vote_pres", "vote_elect_day", "congress_dist",  
+              "STATE_ABV", "dem_cand_abort", "rep_cand_abort", "YEAR", "resp_id", 
+              "age", "age_group", "gender", "race_seven", "race_four", "race_three",
+              "hisp", "edu_four", "edu_seven", "region", "religion", "num_child",
+              "birth_place", "state_congress_dist", "anti_abort_therm", "when_abort",
+              "abort_law") 
+  
+ 
+
+#save as a csv for faster upload later
+#write.csv(anes_renamed_df, file ="ANES_select.csv", row.names = FALSE)
+
+
+
+```
+
+##Voting dataset
+
+```{r}
+#get rid of US as a state- doesn't contain any information just a header interspersed with the data
+vote_df <- vote_df %>% filter(STATE != "United States")
+unique(vote_df$STATE_ABV) #no more cleaning here
+
+```
+##Abortion Policy dataset
+```{r}
+#change State to STATE to allow for merging by state later on
+abortion_policy_df <- abortion_policy_df %>% mutate(STATE = State)
+#need to add STATE_ABV to merge with other two datasets
+state <- read_csv("states.csv")
+state <- state %>% mutate(STATE = State)
+
+abortion_policy_df <- left_join(abortion_policy_df, state, by = "STATE")
+
+#rename abbreviation to match other datasets 
+abortion_policy_df <- abortion_policy_df %>% mutate(STATE_ABV = Abbreviation)
+#since the mutate function keeps old state columns, get rid of for simplicity
+abortion_policy_df <- abortion_policy_df %>% select("Status of Abortion",
+                                                    "Changed","State Law",
+                                                    "STATE", "STATE_ABV")
+
+```
+
+##Combine dataframes for analysis
+```{r}
+#start by combining anes and voter datasets
+anes_vote_df <- left_join(anes_renamed_df, vote_df, by = c("STATE_ABV", "YEAR"))
+#expect it to be as long as anes as there is more individual obvs on that as vote is just info by state and year
+#add in abortion policy df
+
+combined_df <- left_join(anes_vote_df, abortion_policy_df, by = c("STATE_ABV"))
+#expecting just a few more columns to be added to above 
+
+write.csv(combined_df, file ="combined_data.csv", row.names = FALSE)
+```
+
+
+#Analysis
+get summary stats by state and year, save as new df
+use new df above in regression with unit-level being state
+this will only be up to 2020
+DID would be trying to get a bit of inight to see if the trend would be effected by Dobbs
+##Exploratory regression 
+##Differences-in-differences 
+
+```{r}
+#create a variable with the year of "treatment" which is 2022
+df$time = ifelse(df$YEAR >= 2022, 1, 0)
+
+#create interaction between time and the treated variable= changed 
+df$did = df$time * df$Changed
+
+#Estimating the DID estimator
+didreg = lm(VEP ~ Changed + time + did, data = df)
+summary(didreg)
+
+```
+ The coefficient for ‘did’ is the differences-in-differences
+estimator, not significant in this case, but a positive direction. 
+
+```{r}
+didreg1 = lm(VEP ~ Changed*time, data = df)
+summary(didreg1)
+```
+The coefficient for ‘treated#time’ is the differences-indifferences estimator 
+(did in last estimate). Still not significant. 
+
+```{r}
+#simple model 
+reg = lm(VEP ~ Changed, data = df)
+summary(reg)
+```
+still not significant
+
+#some exploratory graphs
+
+```{r}
+#code from https://lfoswald.github.io/2021-spring-stats2/materials/session-8/08-online-tutorial/
+df %>%
+mutate(Changed = ifelse(Changed == 1, "Treated (D=1)", "Untreated (D=0)")) %>%
+group_by(time, Changed) %>% # group to extract means of each group at each time
+mutate(group_mean = mean(VEP)) %>% # extract means of each group at each time
+ggplot(., aes(x = VEP, fill = factor(Changed))) +
+  geom_density(alpha = 0.5) +
+  scale_fill_manual(name = " ", # changes to fill dimension
+                     values = c("#cc0055", "#a7a8aa"),
+                     labels = c("Treatment", "Control")) +
+  facet_grid(Changed~time) + # we specify the matrix (treatment and period)
+  geom_vline(aes(xintercept = group_mean), linetype = "longdash") + # add vertical line with the mean
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = "VEP",
+       y = "Density")
+```
+```{r}
+#code from https://lfoswald.github.io/2021-spring-stats2/materials/session-8/08-online-tutorial/
+df %>%
+group_by(time, Changed) %>% # group to extract means of each group at each time
+mutate(group_mean = mean(VEP)) %>%
+ggplot(aes(x = time, y = group_mean, color = factor(Changed))) +
+  geom_point() +
+  geom_line(aes(x = time, y = group_mean)) +
+  scale_x_continuous(breaks = c(0,1)) +
+  scale_color_manual(name = " ", # changes to color dimension
+                     values = c("#a7a8aa", "#cc0055"),
+                     labels = c("Control", "Treatment")) +
+  labs(x = "Time periods", y = "VEP", color = "Treatment group")+
+  theme_minimal() 
+```
+Would see seperate lines with different slopes if they were different. 
+
