@@ -1,0 +1,393 @@
+---
+title: "Francisco_Group_Proj"
+author: "Taylor Francisco"
+date: "2023-11-26"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r}
+rm(list=ls())
+```
+
+
+#Set Up
+##Load Packages
+```{r}
+library(tidyverse)
+library(dplyr)
+library(purrr)
+library(readstata13)
+library(plyr)
+library(stargazer)
+library(stringr)
+library(ggplot2)
+library(psych)
+library(plm)
+library(visreg)
+library(VGAM)
+library(car)
+```
+
+
+##Upload Data
+```{r}
+anes_df <- read_csv("anes_timeseries_cdf_csv_20220916.csv")
+vote_df <- read_csv("Turnout_1980_2022_v1.0.csv")
+abortion_policy_df <- read_csv("Abortion_Policies.csv")
+```
+
+#Clean Data
+
+##ANES dataset
+```{r}
+#select only variables of interest
+
+anes_select_df <- anes_df %>% select("VCF0302", "VCF0705", "VCF0748", "VCF0900", 
+                                    "VCF0901b", "VCF9234", "VCF9235", "VCF0004", 
+                                    "VCF0006", "VCF0101", "VCF0102", "VCF0104", 
+                                    "VCF0105a", "VCF0105b", "VCF0106","VCF0107",
+                                    "VCF0108", "VCF0110","VCF0112", "VCF0128", 
+                                    "VCF0132","VCF0133", "VCF0138", "VCF0139", 
+                                    "VCF0140a","VCF0142", "VCF0900b", "VCF0230", 
+                                   "VCF0837", "VCF0838")
+
+#save as a csv for faster upload later
+#write.csv(anes_select_df, file ="ANES_select.csv", row.names = FALSE)
+
+#rename variables with descriptive name
+##note name STATE, STATE_ABV, YEAR all caps to match other dataframes
+ d <- anes_select_df  #change name to d to simplify renaming since tidyverse rename() wasn't working
+ d$vote_pres = d$VCF0705
+ d$vote_elect_day =  d$VCF0748
+ d$congress_dist  = d$VCF0900
+d$STATE_ABV = d$VCF0901b 
+d$dem_cand_abort = d$VCF9234 
+ d$rep_cand_abort = d$VCF9234
+ d$YEAR = d$VCF0004
+ d$resp_id = d$VCF0006
+d$age = d$VCF0101
+d$age_group = d$VCF0102
+d$gender  = d$VCF0104
+d$race_seven  = d$VCF0105a 
+d$race_four   = d$VCF0105b 
+d$race_three  = d$VCF0106 
+d$hisp  = d$VCF0108
+d$edu_four  = d$VCF0110
+d$edu_seven   = d$VCF0140a 
+d$region  = d$VCF0112
+d$religion  = d$VCF0128 
+d$num_child = d$VCF0139 
+d$birth_place = d$VCF0142 
+d$state_congress_dist = d$VCF0900b
+d$anti_abort_therm  = d$VCF0230
+d$when_abort  = d$VCF0837
+d$abort_law   = d$VCF0838
+
+#save a df with only renamed variables, dropping VCF#### names
+anes_renamed_df <- d %>% select("vote_pres", "vote_elect_day", "congress_dist",  
+              "STATE_ABV", "dem_cand_abort", "rep_cand_abort", "YEAR", "resp_id", 
+              "age", "age_group", "gender", "race_seven", "race_four", "race_three",
+              "hisp", "edu_four", "edu_seven", "region", "religion", "num_child",
+              "birth_place", "state_congress_dist", "anti_abort_therm", "when_abort",
+              "abort_law") 
+  
+ 
+
+#save as a csv for faster upload later
+#write.csv(anes_renamed_df, file ="ANES_select.csv", row.names = FALSE)
+
+#check that there are only 50 states
+unique(anes_renamed_df$STATE_ABV) #Note, DC and 99 need to be removed
+#get rid of DC and 99 
+anes_renamed_df <- anes_renamed_df %>% filter(STATE_ABV != "DC")
+anes_renamed_df <- anes_renamed_df %>% filter(STATE_ABV != "99")
+unique(anes_renamed_df$STATE_ABV)#no more cleaning here, only 50 states
+
+unique(anes_renamed_df$YEAR)
+#vote_df only has years 1980 and above (our years of interest), so remove earlier years
+
+anes_renamed_df <-  anes_renamed_df %>% filter(YEAR > 1980)
+unique(anes_renamed_df$YEAR) #only 1982 onwards to 2020 
+```
+
+##Voting dataset
+
+```{r}
+#check that there are only 50 states
+unique(vote_df$STATE) #note District of Columbia included. also Pennsylvania* has a * added?
+
+#get rid of US as a state- doesn't contain any information just a header interspersed with the data
+vote_df <- vote_df %>% filter(STATE != "United States")
+vote_df <- vote_df %>% filter(STATE_ABV != "DC")
+unique(vote_df$STATE_ABV) #no more cleaning here, only 50 states 
+
+#change VEP_TURNOUT_RATE to be numberical, right now has % which makes it character
+vote_df$VEP_TURNOUT_RATE <- as.numeric(sub("%", "", vote_df$VEP_TURNOUT_RATE))
+class(vote_df$VEP_TURNOUT_RATE) #is now numeric
+```
+
+##Abortion Policy dataset
+```{r}
+#change State to STATE to allow for merging by state later on
+abortion_policy_df <- abortion_policy_df %>% mutate(STATE = State)
+#need to add STATE_ABV to merge with other two datasets
+state <- read_csv("states.csv") #dataframe with just State name and State abbreviation
+#change State to STATE to allow for merging by state later on
+state <- state %>% mutate(STATE = State)
+
+abortion_policy_df <- left_join(abortion_policy_df, state, by = "STATE")
+
+#rename abbreviation to match other datasets 
+abortion_policy_df <- abortion_policy_df %>% mutate(STATE_ABV = Abbreviation)
+#since the mutate function keeps old state columns, get rid of for simplicity
+abortion_policy_df <- abortion_policy_df %>% select("Status of Abortion",
+                                                    "Changed","State Law",
+                                                    "STATE", "STATE_ABV")
+#rename variables to remove spaces for ease of analysis later on
+
+abortion_policy_df$abort_status = abortion_policy_df$`Status of Abortion`
+abortion_policy_df$state_law  = abortion_policy_df$`State Law`
+```
+
+##Combine dataframes for analysis
+```{r}
+#start by combining anes and voter datasets
+anes_vote_df <- left_join(anes_renamed_df, vote_df, by = c("STATE_ABV", "YEAR"))
+#expect it to be as long as anes as there is more individual obvs on that as vote is just info by state and year
+
+
+#add in abortion policy df
+combined_df <- left_join(anes_vote_df, abortion_policy_df, by = c("STATE_ABV"))
+#expecting just a few more columns to be added to above 
+
+#need just a dataframe of voting and state policy for DiD analysis (anes does not contain 2022)
+vote_abort_df <- left_join(vote_df, abortion_policy_df, by = c("STATE_ABV"))
+
+#save as csv to send to other group members cleaned data 
+#write.csv(combined_df, file ="combined_data.csv", row.names = FALSE)
+#write.csv(vote_abort_df, file ="vote_abort.csv", row.names = FALSE)
+```
+
+#Descriptive Stats
+##Determine missingness of dataframe
+```{r}
+combined_df %>% is.na() %>% colSums()
+#for what we are interested in 
+final_var_df <- combined_df %>% select("STATE_ABV", "YEAR", "age", "gender", 
+                                        "religion", "anti_abort_therm", 
+                                        "VEP_TURNOUT_RATE", "Changed",
+                                        "abort_status", "state_law", "race_four", "abort_law")
+
+final_var_df %>% is.na() %>% colSums()
+#only ones missing are VEP_TURNOUT_RATE and ANTI_ABORT_THERM
+#VEP_TURNOUT_RATE 
+  7775/42348 # only 0.1835978 missing, not a big deal
+#anti_abort_therm
+  36071/42348 #a lot more of this is missing
+#abort_law
+  1510/42348
+
+#find out how much data is missing when using abort_law
+detach(package:plyr)
+ missing_values_count <- final_var_df %>%
+  group_by(STATE_ABV, YEAR) %>%
+  summarize(
+    mean_value = mean(abort_law, na.rm = TRUE),
+    missing_count = sum(is.na(abort_law))
+  )
+ 
+  missing_values_count
+
+#abort_law seems like the way to go
+```
+##Descriptive stats for 
+```{r}
+#basic stats for all variables in the whole dataset
+sub <- combined_df[,c("age", "gender", "religion","anti_abort_therm", "VEP_TURNOUT_RATE", "Changed",
+                                        "abort_status", "state_law", "race_four", "abort_law")]
+
+
+sum <- describe(sub)
+sum
+```
+
+
+```{r}
+all_stats <- final_var_df %>% split(final_var_df$STATE_ABV, final_var_df$YEAR) %>% map(summary)
+states_stats  <- final_var_df  %>% split(final_var_df$STATE_ABV) %>% map(summary)
+```
+
+##Stats by State and Year 
+```{r}
+#what i need to change to be state level 
+#"age", "gender", "religion","race_four", "abort_law"
+
+#age continuous -- mean 
+age_stats <- combined_df %>%                            
+ group_by(STATE_ABV, YEAR) %>%
+ summarize(mean_age = mean(age, na.rm = TRUE),
+           sd_age =sd(age)
+          )
+
+#gender binary --- mean 
+gender_stats <- combined_df %>%                            
+ group_by(STATE_ABV, YEAR) %>%
+ summarize(mean_gender = mean(gender, na.rm = TRUE),
+           sd_gender =sd(gender)
+          )
+#religion categorical--- mode
+##First create mode function 
+my_mode <- function(codes){
+  which.max(tabulate(codes))
+}
+##calculate stats
+religion_stats <- combined_df %>%
+  group_by(STATE_ABV, YEAR) %>%
+  summarise(mode_religion = my_mode(religion))
+unique(religion_stats$mode_religion)
+#race factor =----------- mode
+race_stats <- combined_df %>%
+  group_by(STATE_ABV, YEAR) %>%
+  summarise(mode_race = my_mode(race_four))
+unique(race_stats$mode_race)
+#abort_law is a factor----mode
+abort_stats <- combined_df %>%
+  group_by(STATE_ABV, YEAR) %>%
+  summarise(mode_abort = my_mode(abort_law))
+unique(abort_stats$mode_abort)
+abort_stats
+
+```
+#Analysis
+##changing data to be state-level
+```{r}
+#merge the stats to be included in main df to be used for state-level unit analysis
+state_level_df <- left_join(combined_df, age_stats, by = c("STATE_ABV", "YEAR"))
+state_level_df <- left_join(state_level_df, gender_stats, by = c("STATE_ABV", "YEAR"))
+state_level_df <- left_join(state_level_df, religion_stats, by = c("STATE_ABV", "YEAR"))
+state_level_df <- left_join(state_level_df, race_stats, by = c("STATE_ABV", "YEAR"))
+state_level_df <- left_join(state_level_df, abort_stats, by = c("STATE_ABV", "YEAR"))
+```
+
+##Simple regression
+```{r}
+unique(state_level_df$mode_abort)
+state_level_df$abort.fact <- factor(state_level_df$mode_abort, levels = c(1, 2, 3, 4), 
+                        labels = c("Never", "Only for rape, incest, or danger to Mother",
+                                   "Allowed for other reasons", 
+                                   "Always"), exclude = NA, ordered= FALSE)
+
+#only viewing thoughts on abortion
+m1 <- lm(VEP_TURNOUT_RATE ~ abort.fact, data =state_level_df)
+summary(m1)
+
+#adding in some controls 
+m2 <- lm(VEP_TURNOUT_RATE ~ abort.fact + YEAR + STATE_ABV, data =state_level_df)
+summary(m2)
+
+#add in interaction with State 
+
+m3 <- lm(VEP_TURNOUT_RATE ~ abort.fact + YEAR + STATE_ABV + abort.fact*STATE_ABV, data =state_level_df)
+summary(m3)
+
+```
+
+##Regression with demo as controls
+```{r}
+m4 <- lm(VEP_TURNOUT_RATE ~ abort.fact + YEAR + mean_age + mean_gender + 
+           mode_religion + mode_race, data =state_level_df)
+summary(m4)
+```
+
+##Differences-in-differences 
+
+```{r}
+#create a variable with the year of "treatment" which is 2022
+vote_abort_df$time = ifelse(vote_abort_df$YEAR >= 2021, 1, 0)
+unique(vote_abort_df$YEAR)
+unique(vote_abort_df$time)
+
+#create interaction between time and the treated variable= changed 
+vote_abort_df$did = vote_abort_df$time * vote_abort_df$Changed
+
+#Estimating the DID estimator
+didreg = lm(VEP_TURNOUT_RATE ~ Changed + time + did, data = vote_abort_df)
+summary(didreg)
+
+```
+ 
+
+```{r}
+didreg1 = lm(VEP_TURNOUT_RATE ~ Changed*time, data = vote_abort_df)
+summary(didreg1)
+```
+The coefficient for ‘treated#time’ is the differences-indifferences estimator 
+(did in last estimate). Still not significant. 
+
+```{r}
+#simple model 
+reg = lm(VEP_TURNOUT_RATE ~ Changed, data = vote_abort_df)
+summary(reg)
+```
+still not significant
+
+#some exploratory graphs
+
+```{r}
+#code from https://lfoswald.github.io/2021-spring-stats2/materials/session-8/08-online-tutorial/
+vote_abort_df %>%
+mutate(Changed = ifelse(Changed == 1, "Treated (D=1)", "Untreated (D=0)")) %>%
+group_by(time, Changed) %>% # group to extract means of each group at each time
+mutate(group_mean = mean(VEP_TURNOUT_RATE)) %>% # extract means of each group at each time
+ggplot(., aes(x = VEP_TURNOUT_RATE, fill = factor(Changed))) +
+  geom_density(alpha = 0.5) +
+  scale_fill_manual(name = " ", # changes to fill dimension
+                     values = c("#cc0055", "#a7a8aa"),
+                     labels = c("Treatment", "Control")) +
+  facet_grid(Changed~time) + # we specify the matrix (treatment and period)
+  geom_vline(aes(xintercept = group_mean), linetype = "longdash") + # add vertical line with the mean
+  theme_bw() +
+  theme(legend.position = "none") +
+  labs(x = "VEP Turnout Rate",
+       y = "Density")
+```
+```{r}
+#code from https://lfoswald.github.io/2021-spring-stats2/materials/session-8/08-online-tutorial/
+vote_abort_df%>%
+group_by(YEAR, Changed) %>% # group to extract means of each group at each time
+mutate(group_mean = mean(VEP_TURNOUT_RATE)) %>%
+ggplot(aes(x = YEAR, y = group_mean, color = factor(Changed))) +
+  geom_point() +
+  geom_line(aes(x = YEAR, y = group_mean)) +
+  scale_color_manual(name = " ", # changes to color dimension
+                     values = c("#a7a8aa", "#cc0055"),
+                     labels = c("Control", "Treatment")) +
+  labs(x = "Time periods", y = "VEP Turnout Rate", color = "Treatment group")+
+  theme_minimal() 
+```
+Would see seperate lines with different slopes if they were different. 
+#another graph 
+```{r}
+
+vote_abort_df %>%
+  group_by(Changed, time) %>%
+  summarize(mean_outcome = mean(VEP_TURNOUT_RATE),
+            ci_lower = mean_outcome - 1.96 * sd(VEP_TURNOUT_RATE) / sqrt(n()),
+            ci_upper = mean_outcome + 1.96 * sd(VEP_TURNOUT_RATE) / sqrt(n())) %>%
+  
+  ggplot(aes(x = time, y = mean_outcome, color = as.factor(Changed))) +
+  geom_line(aes(group = Changed), size = 1) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), width = 0.1) +
+  
+  labs(title = "Difference-in-Differences Plot",
+       x = "Time",
+       y = "Mean Outcome") +
+  
+  theme_minimal()
+```
+
+
