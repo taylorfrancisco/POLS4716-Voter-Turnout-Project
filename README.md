@@ -19,20 +19,21 @@ dynamics' immediate implications on political participation. Alongside DiD, a re
 correlating 2022 voter turnout rates with state abortion law restrictiveness was employed to further 
 explore the complex relationship between abortion policies and political engagement.
 
-The analysis of the relationship between abortion policy and voter turnout rates revealed several 
+The analysis of the relationship between abortion policy and voter turnout rates revealed some 
 significant findings with implications for the future of abortion politics in the United States. 
-Across four regression models on data from 1980 to 2022, a consistent negative association between 
-changes in abortion laws and voter turnout is observed, suggesting a persistent impact on political 
-participation.
+The linear regression revealed significant associations between abortion policy categories and 
+voter turnout rates. States allowing legal abortion, as well as those with specific
+gestational limits, exhibit notably higher voter turnout rates compared to states where abortion is
+banned. The model, grounded in the most recent data, highlights the ongoing relevance of
+abortion policy dynamics in shaping political participation.
 
-However, states with legalized abortion and specific gestational limits exhibit higher voter turnout
-rates, emphasizing the nuanced influence of policy contexts. Despite these insights, limitations 
-such as the recency of the Dobbs decision and untested assumptions in the DiD method raise concerns 
-about the robustness of the findings. Additionally, the lack of control for demographic variables and 
-unexplored spillover effects highlight the need for further research to enhance methodological 
-rigor and comprehensiveness in evaluating the impact of abortion policies on civic engagement. 
-Addressing these limitations will be crucial for a more accurate understanding of the future trajectory
-of abortion politics and electoral behavior in the United States.
+Despite these insights, limitations such as the recency of the Dobbs decision and thus limited 
+data and untested assumptions in the DiD method raise concerns about the robustness of the findings. 
+Additionally, the lack of control for demographic variables and unexplored spillover effects 
+highlight the need for further research to enhance methodological rigor and comprehensiveness in 
+evaluating the impact of abortion policies on civic engagement. Addressing these limitations will
+be crucial for a more accurate understanding of the future trajectoryof abortion politics and
+electoral behavior in the United States.
 
 
 
