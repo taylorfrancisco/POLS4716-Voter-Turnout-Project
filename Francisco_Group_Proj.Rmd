@@ -177,7 +177,7 @@ write.csv(combined_df, file ="combined_data.csv", row.names = FALSE)
 get summary stats by state and year, save as new df
 use new df above in regression with unit-level being state
 this will only be up to 2020
-DID would be trying to get a bit of inight to see if the trend would be effected by Dobbs
+DID would be trying to get a bit of insight to see if the trend would be effected by Dobbs
 ##Exploratory regression 
 ##Differences-in-differences 
 
