@@ -13,8 +13,8 @@ those with increased restrictions post-Dobbs. This approach allows for causal in
 establishing treated and control groups, crucial for isolating the effects of policy changes from 
 temporal trends. 
 
-Additionally, the analysis spans two DiD models covering midterm elections from 1982 to 2022 and 
-elections from 2010 to 2022, offering comprehensive insights into long-term trends and recent policy 
+Two DiD models covering midterm elections from 1982 to 2022 and 
+elections from 2010 to 2022 were performed, offering comprehensive insights into long-term trends and recent policy 
 dynamics' immediate implications on political participation. Alongside DiD, a regression model 
 correlating 2022 voter turnout rates with state abortion law restrictiveness was employed to further 
 explore the complex relationship between abortion policies and political engagement.
